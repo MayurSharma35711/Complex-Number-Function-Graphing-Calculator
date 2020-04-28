@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <script src=https://unpkg.com/mathjs@6.6.2/dist/math.min.js></script>
+        <!--<script src="https://raw.githubusercontent.com/lodash/lodash/4.17.15-npm/lodash.js"></script>
+        <script src="https://raw.githubusercontent.com/lodash/lodash/4.17.15-npm/lodash.min.js"></script>-->
+        <meta charset="utf-8">
+        <title>Complex Graphing</title>
+        <style>
+            div{
+                background: #FFF;
+                color: #000;
+            }
+            input[type=text]{
+                border: 1px #FFF solid;
+                text-align: left;
+                color: black;
+                background: aliceblue;
+            }
+            p.title{
+                font-size: 16px;
+            }
+            p.subt{
+                font-size: 12px;
+            }
+            canvas{
+                position: absolute;
+                right: 0px;
+                bottom: 0px;
+                border:1px solid #FFF;
+                width:1285px;
+                height: 788px;
+            }
+        </style>
+    </head>
+    <body>
+        <div>
+            <p class="title"> f(z)=<input type="text" id="func1" onkeypress="update(event)" value="blank"> </p>
+            <p class = "subt" > R-min<input type="text" id="r1min" onkeypress="update(event)" value="blank"> </p>
+            <p class = "subt" > R-max<input type="text" id="r1max" onkeypress="update(event)" value="blank"> </p>
+            <p class = "subt" > Theta-min <input type="text" id="t1min" onkeypress="update(event)" size = "4" value="0">π </p>
+            <p class = "subt" > Theta-max <input type="text" id="t1max" onkeypress="update(event)" size = "4" value="2">π </p>
+            <p class = "subt" > R-intervals <input type="text" id="r-int" onkeypress="update(event)" size = "4" value="2"> </p>
+            <p class = "subt" > Theta-intervals <input type="text" id="t-int" onkeypress="update(event)" size = "4" value="16"> </p>
+            <p class = "subt" > Coordinate R max <input type="text" id="coordmax" onkeypress="update(event)" size = "5" value="1"> </p>
+            <p class = "subt" > Lines <input type="checkbox" id="lines" name="lines" onclick="linefunc()"> </p>
+            
+            <!--<p class = "title" > <br/> g(z)=<input type="text" id="func2" onkeypress="update(event)" value="blank"> </p> 
+            <p class = "subt" > R-min<input type="text" id="r2min" onkeypress="update(event)" value="blank"> </p>
+            <p class = "subt" > R-max<input type="text" id="r2max" onkeypress="update(event)" value="blank"> </p>
+            <p class = "subt" > Theta-min <input type="text" id="t2min" onkeypress="update(event)" size = "2" value="0">π </p>
+            <p class = "subt" > Theta-max <input type="text" id="t2max" onkeypress="update(event)" size = "2" value="2">π </p> -->
+        </div>
+        <canvas id="graph"> </canvas>
+        <script language = "Javascript">
+            // global variables
+            var funcData = [[],[]];
+            var r_range = 2;
+            var t_range = 32;
+            var x_range = 24;
+            var y_range = 16;
+            var canvW = 1300;
+            var canvH = 800;
+            var initData;
+            var finData;
+            var rmax,rmin,tmin,tmax;
+            var coordMax;
+            var canvas = document.getElementById("graph");
+            var draw = canvas.getContext('2d');
+            var intVal;
+            var depth = 0;
+            var useLines = false;
+            
+            // get, process, store input data and start everything else
+            function linefunc(){
+                useLines = !useLines;
+                update(event);
+                print();
+            }
+            // Parent Function 
+            function update(event) {
+                canvSetUp(canvas);
+                clearprior();
+                //console.log(event.keyCode);
+                if(event.keyCode==13) //if it's the enter key
+                {
+                    var f1 = document.getElementById("func1").value;
+                    getFuncData(1);
+                    // read x, y and so on
+                    func = convert(f1, 1); // get basic data needed
+                    calculateAll(f1); // calculate all values
+                    clearprior();
+                }
+                print();
+            }
+            // Child function 1
+            function getFuncData(num){
+                for(var i=0;i<4;i++)
+                {
+                    var pre, post; 
+                    if(i>1)
+                        pre = "t";
+                    else
+                        pre = "r";
+                    if(i%2==0)
+                        post = "min";
+                    else 
+                        post = "max";
+                    funcData[num-1][i] = document.getElementById(pre+num+post).value;
+                }// rmin, rmax, tmin, tmax
+                r_range = document.getElementById("r-int").value;
+                t_range = document.getElementById("t-int").value;
+                coordMax = document.getElementById("coordmax").value;
+                initData = create2Darr(r_range+1); // has to include start and end
+                finData = create2Darr(r_range+1);
+            }
+            // Child function 2
+            function convert(func, index){
+                rmin = parseFloat(funcData[index-1][0]);
+                rmax = parseFloat(funcData[index-1][1]);
+                tmin = parseFloat(funcData[index-1][2]);
+                tmax = parseFloat(funcData[index-1][3]);
+                var magIndex = 0;
+                var angIndex = 0;
+                for(var r = rmin; r <= rmax; r+=(rmax-rmin)/(r_range))
+                {
+                    for(var t = tmin; t < tmax; t+=(tmax-tmin)/t_range)
+                    {
+                        initData[magIndex][angIndex] = [r,t];
+//                        rawData[magIndex][angIndex] = func.replace("z","("+r*math.cos(t*math.pi)+"+i"+r*math.sin(t*math.pi)+")");
+                        angIndex++;
+                    }
+                    magIndex++;
+                    angIndex=0;
+                }
+                intVal = coordMax/6;//math.round(1000*3*rmax/(y_range))/1000;
+            }
+            function clearprior(){
+                funcData = [[],[]];
+                mathExp = new tree("+");
+                mathExp.desc.push(math.complex(0,0));
+                depth = 0;
+            }
+            
+            // process data
+            class tree {
+                constructor(value){
+                    this.value = value;
+                    this.desc = [];
+                }
+                remove(index,newIndex){
+                    this.desc.push(this.desc[index].desc[newIndex]);
+                    this.desc.splice(index,1);
+                }
+                removeFull(index){
+                    this.desc.splice(index,1);
+                }
+                static copier(a, b){ // serialize and deserialize instead
+                    if(isNum(b.desc[0]) && isNum(b.desc[1]))
+                    {
+                        a.desc.push(b.desc[0]);
+                        a.desc.push(b.desc[1]);
+                        return;
+                    }
+                    a.desc.push(b.desc[0].clone());
+                    a.desc.push(b.desc[1].clone());
+                    tree.copier(a.desc[1],b.desc[1]);
+                }
+            }
+            var mathExp = new tree("+");
+            mathExp.desc.push(math.complex(0,0));
+            var plugInExp = new tree("+");
+            var md_count = 0;
+            
+            function add(c1,c2){
+                var c3 = math.complex(0,0);
+                c3.re+=(c1.re+c2.re);
+                c3.im+=(c1.im+c2.im);
+                return c3;
+            }
+            function mult(c1,c2){
+                var c3 = math.complex(0,0);
+                c3.re+=(c1.re*c2.re-c1.im*c2.im);
+                c3.im+=(c1.re*c2.im+c1.im*c2.re);
+                return c3;
+            }
+            function addNum2Tree(exp,index){
+                if(exp[index] == "i")
+                    return math.complex(0,1);
+                else if(exp[index] == "z")
+                    return "z";
+                else
+                    return math.complex(parseFloat(exp.substring(index),0));
+            }
+            function isNum(test){
+                if(math.isNumber(test)){
+                    return true;
+                }
+                else if (math.isNumber(test.im))
+                {
+                    return true;
+                }
+                return false;
+            }
+            
+            function interpret(exp,treeExp){ 
+                // exit case
+                var i = 0;
+                if(exp.length == addNum2Tree(exp,i).toString().length) // no end spaces
+                {
+                    treeExp.desc.push(new tree(addNum2Tree(exp,i)));
+                    return;
+                }
+                
+                // get number
+                while(exp[i] == " " || exp[i] == ")" || exp[i] == "(")
+                      i++;
+                var num = addNum2Tree(exp,i);
+                var num_length = num.toString().length;
+//                console.log(num+"\t"+exp+"\t"+exp.length);
+                
+                // get operation
+                i+=num_length;
+                while(exp[i] == " " || exp[i] == ")" || exp[i] == "(")
+                      i++;
+                const op = new tree(exp[i]);
+                if(exp[i] == "*" || exp[i] == "/")
+                    md_count++;
+//                console.log(exp[i]+"\t"+exp+"\t"+exp.length);
+                
+                // put everything into treme and re-run
+                treeExp.desc.push(op);
+                op.desc.push(num);
+                depth++;
+                interpret(exp.substring(i+1),op)
+            }
+            function replaceVars(treeExp, newTerm){ 
+                if(treeExp.desc[1].value != "+" && treeExp.desc[1].value != "-" && treeExp.desc[1].value != "*" && treeExp.desc[1].value != "/"){
+                    if(treeExp.desc[1].value == "z")
+                    {
+                        treeExp.desc[1] = new tree(newTerm);
+                        if(treeExp.desc[0] == "z")
+                        {
+                            treeExp.desc[0] = newTerm;
+                            return 1;
+                        }
+                        return 1;
+                    }
+                    else if(treeExp.desc[0] == "z")
+                    {
+                        treeExp.desc[0] = newTerm;
+                        return 1;
+                    }
+                    return 0; 
+                }
+                if(treeExp.desc[0] == "z")
+                {
+                    treeExp.desc[0] = newTerm;
+                    return 1;
+                }
+                return replaceVars(treeExp.desc[1],newTerm);
+            } // replaces z's
+            function calculateMD_Sing(treeExp){
+                if(isNum(treeExp.desc[1].desc[1].value))
+                {
+                    if(treeExp.desc[1].value != "*" && treeExp.desc[1].value != "/")
+                        return false;
+                    if(treeExp.desc[1].value == "*")
+                        treeExp.desc[1].value = mult(treeExp.desc[1].desc[0],treeExp.desc[1].desc[1].value);
+                    if(treeExp.desc[1].value == "/")
+                        treeExp.desc[1].value = mult(treeExp.desc[1].desc[0],math.inv(treeExp.desc[1].desc[1].value));
+                    treeExp.desc[1].removeFull(0);
+                    treeExp.desc[1].removeFull(0);
+                    md_count--;
+                    depth--;
+                    return true;
+                }
+                else if(treeExp.desc[1].value == "*" || treeExp.desc[1].value == "/")
+                {
+                    if(treeExp.desc[1].value == "*")
+                        treeExp.desc[1].desc[1].desc[0] = mult(treeExp.desc[1].desc[0],treeExp.desc[1].desc[1].desc[0]);
+                    if(treeExp.desc[1].value == "/")
+                        treeExp.desc[1].desc[1].desc[0] = mult(treeExp.desc[1].desc[0],math.inv(treeExp.desc[1].desc[1].desc[0]));
+                    treeExp.remove(1,1);
+                    md_count--;
+                    depth--;
+                    return true;
+                }
+                return calculateMD_Sing(treeExp.desc[1]);
+            }
+            function calculateAS_Sing(treeExp){
+//                if(treeExp.desc[1].value != "+" && treeExp.desc[1].value != "-" && treeExp.desc[1].value != "*" && treeExp.desc[1].value != "/"){
+                if(isNum(treeExp.desc[1].value))
+                {
+                    if(treeExp.value != "+" && treeExp.value != "-")
+                        return false;
+                    if(treeExp.value == "+")
+                        treeExp.value = add(treeExp.desc[0],treeExp.desc[1].value);
+                    if(treeExp.value == "-")
+                        treeExp.value = add(treeExp.desc[0],math.complex(-treeExp.desc[1].value.re,-treeExp.desc[1].value.im));
+                    treeExp.removeFull(0);
+                    treeExp.removeFull(0);
+                    depth--;
+                    return true;
+                }
+//                console.log("here");
+                return calculateAS_Sing(treeExp.desc[1]);
+            }
+            
+            function calculateAll(exp){
+                var outPutX=0;
+                var outPutY=0;
+//                console.log(exp);
+                for(var r = rmin; r <= rmax; r+=(rmax-rmin)/(r_range))
+                {
+                    for(var t = tmin; t < tmax; t+=(tmax-tmin)/t_range)
+                    { 
+                        interpret(exp,mathExp);
+//                        plugInExp = new tree("+");
+//                        tree.copier(plugInExp,mathExp);
+                        
+                        // it should be plugInExp, but dereferencing objects was nonfunctional
+                        
+//                        console.log("calc-ed 1\t"+depth + "\t");
+                        while(replaceVars(mathExp, math.complex(r*math.cos(t*math.pi),r*math.sin(t*math.pi))));
+                        
+//                        console.log("calc-ed 2\t"+depth + "\t");
+                        while(md_count>0){
+                            calculateMD_Sing(mathExp);
+                        }
+                        
+//                        console.log("calc-ed 3\t"+depth + "\t");
+                        while(depth>0)
+                            calculateAS_Sing(mathExp);
+                        
+                        if(isNum(mathExp.value))
+                            finData[outPutX][outPutY]=mathExp.value;
+                        else
+                            finData[outPutX][outPutY] = mathExp.desc[1].value;
+                        outPutY++;
+                        clearprior();
+                    }
+                    outPutX++;
+                    outPutY=0;
+                }
+            }
+            
+            // graphics functions
+            var pos;
+            var pSize;
+            function print(){
+                coordPrint();
+                printInput();
+                printOutput();
+                printLines();
+            }
+            function coordPrint(){
+                drawLine(canvW/2,0,canvW/2,canvH,.6,"darkblue"); //vert axis
+                draw.font = "18px Arial";
+                draw.fillText("Im",canvW/2+5,25);
+                draw.font = "10px Arial";
+                draw.fillText("gap is " + math.round(intVal*1000)/1000+ "i",canvW/2+5,40);
+                
+                drawLine(0,canvH/2,canvW,canvH/2,.6,"darkblue"); //hori axis
+                draw.font = "18px Arial";
+                draw.fillText("Re",canvW-60,canvH/2-10);
+                draw.font = "10px Arial";
+                draw.fillText("gap is " + math.round(intVal*1000)/1000,canvW-80,canvH/2+10);
+                
+                for(var x=0; x<=y_range; x++)
+                {
+                    drawLine(0,x*math.floor(canvH/y_range),canvW,x*math.floor(canvH/y_range),.17,"darkblue");
+                }
+                for(var y=0;y<=x_range;y++)
+                {
+                    drawLine(y*math.floor(canvW/x_range),0,y*math.floor(canvW/x_range),canvH,.17,"darkblue");
+                }
+            }
+            function printInput(){
+                // positions relative to the origin
+                var xloc_relOrig;
+                var yloc_relOrig;
+                pSize = 4;
+                for(var i = 0;i<initData.length;i++)
+                {
+                    for(var j = 0;j<initData[i].length;j++)
+                    {
+                        xloc_relOrig = initData[i][j][0]*math.cos(math.pi*initData[i][j][1]);
+                        xloc_relOrig = math.round(xloc_relOrig*1000)/1000;
+                        yloc_relOrig = initData[i][j][0]*math.sin(math.pi*initData[i][j][1]);
+                        yloc_relOrig = math.round(yloc_relOrig*1000)/1000;
+                        pos = rel2act(xloc_relOrig,yloc_relOrig);
+                        draw.fillStyle="green";
+                        draw.fillRect(pos[0]-pSize/2, pos[1]-pSize/2, pSize, pSize);
+                    }
+                }
+            }
+            function printOutput(){
+                for(var i=0;i<initData.length;i++)
+                {
+                    for(var j=0;j<initData[i].length;j++)
+                    {
+                        var fpos = rel2act(finData[i][j].re,finData[i][j].im);
+                        draw.fillStyle="red";
+                        draw.fillRect(fpos[0]-pSize/2,fpos[1]-pSize/2,pSize,pSize);
+                    }
+                }
+            }
+            function printLines(){
+                for(var i=0;i<initData.length;i++)
+                {
+                    for(var j=0;j<initData[i].length;j++)
+                    {
+                        xloc_relOrig = initData[i][j][0]*math.cos(math.pi*initData[i][j][1]);
+                        xloc_relOrig = math.round(xloc_relOrig*1000)/1000;
+                        yloc_relOrig = initData[i][j][0]*math.sin(math.pi*initData[i][j][1]);
+                        yloc_relOrig = math.round(yloc_relOrig*1000)/1000;
+                        pos = rel2act(xloc_relOrig,yloc_relOrig);
+                        fpos = rel2act(finData[i][j].re,finData[i][j].im);
+                        if(useLines)
+                        {
+                            drawLine(pos[0],pos[1],fpos[0],fpos[1],0.5,"lightgrey");
+                        }
+                    }
+                }
+            }
+            
+            //graphics and algorithm tools
+            function rel2act(x,y){
+                var xpos = canvW/2 + x/intVal*canvW/x_range;
+                var ypos = canvH/2 - y/intVal*canvH/y_range;
+                return [xpos,ypos];
+            }
+            function create2Darr(rows){
+                var arr =[];
+                for(var i=0;i<rows;i++)
+                    arr[i] = [];
+                return arr;
+            }
+            function canvSetUp(can){
+                // pixel to window size
+                var ratio = window.devicePixelRatio || 1;
+                // size of current window
+                var drawSize = can.getBoundingClientRect();
+                can.width = drawSize.width*ratio;
+                can.height = drawSize.height*ratio;
+                draw.scale(ratio,ratio);
+            }
+            function drawLine(x1,y1,x2,y2,width,color){
+                draw.beginPath();
+                draw.lineWidth=width;
+                draw.strokeStyle=color;
+                draw.moveTo(x1,y1);
+                draw.lineTo(x2,y2);
+                draw.stroke();
+            }
+        </script>
+    </body>
+</html>
